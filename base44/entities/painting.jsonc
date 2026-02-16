@@ -1,0 +1,26 @@
+{
+  "name": "Painting",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Name of the painting"
+    },
+    "image_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL of the uploaded painting image"
+    },
+    "artist_name": {
+      "type": "string",
+      "description": "Display name of the artist"
+    }
+  },
+  "required": ["title", "image_url"],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": { "created_by": "{{user.email}}" },
+    "delete": { "created_by": "{{user.email}}" }
+  }
+}
