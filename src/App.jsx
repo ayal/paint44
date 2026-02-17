@@ -20,7 +20,25 @@ export default function App() {
   const canvasRef = useRef(null);
 
   useEffect(() => {
+    document.title = "paint44";
     loadPaintings();
+
+    const unsub = base44.entities.Painting.subscribe((event) => {
+      setPaintings((prev) => {
+        if (event.type === "create") {
+          return [event.data, ...prev];
+        }
+        if (event.type === "update") {
+          return prev.map((p) => (p.id === event.id ? event.data : p));
+        }
+        if (event.type === "delete") {
+          return prev.filter((p) => p.id !== event.id);
+        }
+        return prev;
+      });
+    });
+
+    return () => unsub();
   }, []);
 
   async function loadPaintings() {
@@ -48,7 +66,6 @@ export default function App() {
       });
       setTitle("");
       canvasRef.current?.clear();
-      await loadPaintings();
     } catch (err) {
       console.error("Submit failed:", err);
       alert("Failed to submit painting. Try again!");
@@ -130,6 +147,7 @@ const Canvas = forwardRef(function Canvas({ onSubmit, submitting, title, setTitl
   const [color, setColor] = useState("#ffffff");
   const [brushSize, setBrushSize] = useState(4);
   const lastPos = useRef(null);
+  const history = useRef([]);
 
   useImperativeHandle(ref, () => ({ clear: clearCanvas }));
 
@@ -157,9 +175,16 @@ const Canvas = forwardRef(function Canvas({ onSubmit, submitting, title, setTitl
     };
   }, []);
 
+  const saveSnapshot = useCallback(() => {
+    const ctx = ctxRef.current;
+    history.current.push(ctx.getImageData(0, 0, CANVAS_W, CANVAS_H));
+    if (history.current.length > 50) history.current.shift();
+  }, []);
+
   const startDraw = useCallback(
     (e) => {
       e.preventDefault();
+      saveSnapshot();
       setDrawing(true);
       const pos = getPos(e);
       lastPos.current = pos;
@@ -169,7 +194,7 @@ const Canvas = forwardRef(function Canvas({ onSubmit, submitting, title, setTitl
       ctx.fillStyle = color;
       ctx.fill();
     },
-    [color, brushSize, getPos]
+    [color, brushSize, getPos, saveSnapshot]
   );
 
   const draw = useCallback(
@@ -194,7 +219,14 @@ const Canvas = forwardRef(function Canvas({ onSubmit, submitting, title, setTitl
     lastPos.current = null;
   }, []);
 
+  function undo() {
+    if (history.current.length === 0) return;
+    const ctx = ctxRef.current;
+    ctx.putImageData(history.current.pop(), 0, 0);
+  }
+
   function clearCanvas() {
+    saveSnapshot();
     const ctx = ctxRef.current;
     ctx.fillStyle = "#111118";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
@@ -231,6 +263,7 @@ const Canvas = forwardRef(function Canvas({ onSubmit, submitting, title, setTitl
               onChange={(e) => setBrushSize(Number(e.target.value))}
             />
           </label>
+          <button className="btn btn-ghost btn-sm" onClick={undo}>Undo</button>
           <button className="btn btn-ghost btn-sm" onClick={clearCanvas}>Clear</button>
         </div>
       </div>
